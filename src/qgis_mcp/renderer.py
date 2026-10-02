@@ -68,6 +68,11 @@ BASEMAPS = {
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         "Imagen satelital: Esri, Maxar, Earthstar Geographics",
     ),
+    "google": (
+        "Google Satélite",
+        "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        "Imagen satelital: Google",
+    ),
     "osm": ("OpenStreetMap", "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "Mapa base: © colaboradores de OpenStreetMap"),
 }
 
