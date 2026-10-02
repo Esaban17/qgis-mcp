@@ -23,6 +23,7 @@ from qgis.core import (
     QgsPrintLayout,
     QgsProject,
     QgsRectangle,
+    QgsSingleSymbolRenderer,
     QgsTextFormat,
     QgsUnitTypes,
 )
@@ -193,7 +194,9 @@ def build_layout(
     legend.setAutoUpdateModel(False)
     root = legend.model().rootGroup()
     root.removeAllChildren()
-    for layer in legend_layers:
+    # Single-symbol layers have no group header; listing them after a classified
+    # group makes them read as one of its classes, so they go first.
+    for layer in sorted(legend_layers, key=lambda lyr: not _single_symbol(lyr)):
         root.addLayer(layer)
     legend.setLegendFilterByMapEnabled(True)
     legend.setSymbolHeight(3.5)
@@ -256,3 +259,8 @@ def export(layout: QgsPrintLayout, output_path: str, dpi: int = 300) -> str:
     if result != QgsLayoutExporter.Success:
         raise RuntimeError(f"QGIS no pudo exportar el mapa (código {result}): {exporter.errorMessage()}")
     return str(out.resolve())
+
+
+def _single_symbol(layer) -> bool:
+    renderer = layer.renderer() if hasattr(layer, "geometryType") else None
+    return isinstance(renderer, QgsSingleSymbolRenderer)
