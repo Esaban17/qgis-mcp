@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qgis-mcp"
+version = "0.1.0"
+description = "MCP server that builds thematic maps with QGIS over a project shape"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+# PyQGIS is not on PyPI: it comes with the QGIS installation (see README).
+dependencies = ["mcp>=2.2,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+qgis-mcp = "qgis_mcp.server:main"
+qgis-mcp-install-plugin = "qgis_mcp.install_plugin:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+qgis_mcp = ["metadata.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

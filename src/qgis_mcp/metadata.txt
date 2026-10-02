@@ -1,0 +1,10 @@
+[general]
+name=QGIS MCP
+qgisMinimumVersion=3.28
+description=Recibe órdenes del servidor MCP para generar mapas temáticos sobre el shape del proyecto.
+version=0.1.0
+author=Estuardo Saban
+about=Abre un socket local (127.0.0.1:9876) por el que el servidor qgis-mcp define el área del proyecto, agrega las 15 capas temáticas con su estilo y genera los mapas como diseños de impresión dentro del proyecto abierto.
+repository=https://github.com/Esaban17/qgis-mcp
+tracker=https://github.com/Esaban17/qgis-mcp/issues
+experimental=True
