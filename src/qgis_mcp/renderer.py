@@ -117,6 +117,8 @@ def render_map(
     if extent_mode == "layers":
         for _, layer in sources_loaded:
             extent.combineExtentWith(layer_extent(layer, target))
+        # Keep features of the farthest layer off the frame edge.
+        extent = buffered_extent(extent, 5.0)
 
     live = project is not None
     if live:
