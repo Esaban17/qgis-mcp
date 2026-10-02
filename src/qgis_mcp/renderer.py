@@ -61,6 +61,31 @@ def validate_layer(entry: LayerEntry) -> dict:
     }
 
 
+# XYZ tile services usable as a background: key -> (layer name, url, credit).
+BASEMAPS = {
+    "satelite": (
+        "Imagen satelital",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "Imagen satelital: Esri, Maxar, Earthstar Geographics",
+    ),
+    "osm": ("OpenStreetMap", "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "Mapa base: © colaboradores de OpenStreetMap"),
+}
+
+
+def basemap_layer(key: str):
+    from urllib.parse import quote
+
+    from qgis.core import QgsRasterLayer
+
+    if key not in BASEMAPS:
+        raise ValueError(f"basemap debe ser uno de: {', '.join(BASEMAPS)}")
+    name, url, _ = BASEMAPS[key]
+    layer = QgsRasterLayer(f"type=xyz&url={quote(url, safe=':/')}&zmin=0&zmax=19", name, "wms")
+    if not layer.isValid():
+        raise RuntimeError(f"No se pudo cargar el mapa base {name}.")
+    return layer
+
+
 def render_map(
     session: MapSession,
     output_path: str,
@@ -76,6 +101,7 @@ def render_map(
     grid: bool = True,
     save_project: bool = True,
     labels: bool = True,
+    basemap: str | None = None,
     project=None,
 ) -> dict:
     """Render one map sheet with the selected layers over the project shape.
@@ -92,6 +118,7 @@ def render_map(
 
     if extent_mode not in EXTENT_MODES:
         raise ValueError(f"extent debe ser uno de: {', '.join(EXTENT_MODES)}")
+    background = basemap_layer(basemap) if basemap else None
     area = session.require_area()
     entries = session.select(layer_types)
     if not entries:
@@ -181,7 +208,11 @@ def render_map(
     add_to_project(area_saved)
     # Map item wants top-most first; the project shape outline always stays on top.
     top_first = [area_saved, *reversed(map_layers)]
-    legend_layers = top_first
+    legend_layers = list(top_first)
+    if background is not None:
+        add_to_project(background)
+        top_first.append(background)
+        sources = "; ".join(filter(None, [sources, BASEMAPS[basemap][2]]))
 
     subtitle = subtitle if subtitle is not None else f"Proyecto: {area.name}"
     notes = default_notes(area.name, target, sources)

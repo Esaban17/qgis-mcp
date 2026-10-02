@@ -184,6 +184,7 @@ async def generate_map(
     margin_percent: float = 10.0,
     dpi: int = 300,
     sources: str | None = None,
+    basemap: Literal["satelite", "osm"] | None = None,
     grid: bool = True,
     labels: bool = True,
     open_layout: bool = True,
@@ -202,6 +203,8 @@ async def generate_map(
         extent: "project" zooms to the project shape, "layers" to all layers.
         margin_percent: Space around the project shape, in % of its size.
         sources: Data sources credited in the notes box.
+        basemap: Background under the layers: "satelite" (Esri World Imagery)
+            or "osm" (OpenStreetMap). Needs internet; credited in the notes.
     """
 
 
@@ -215,6 +218,7 @@ async def generate_map_series(
     orientation: Literal["landscape", "portrait"] = "landscape",
     dpi: int = 300,
     sources: str | None = None,
+    basemap: Literal["satelite", "osm"] | None = None,
 ) -> dict:
     """Render one map per thematic layer (e.g. Mapa de Zonas de Vida, Mapa de Cuencas...).
 
@@ -224,6 +228,7 @@ async def generate_map_series(
         output_dir: Folder for the maps (numbered by drawing order).
         layers: Layer types to map (all added layers when omitted).
         context_layers: Layers repeated on every sheet for reference, e.g. ["rios", "vias_acceso"].
+        basemap: "satelite" or "osm" background on every sheet (needs internet).
     """
 
 
