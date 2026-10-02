@@ -268,6 +268,9 @@ LAYER_TYPES: tuple[LayerType, ...] = (
         marker="triangle",
         z=95,
         clip="none",
+        # Zoom to every volcano in the file: a fixed margin around a small
+        # project leaves volcanoes tens of km away off the sheet.
+        extent="layer",
         margin_percent=150.0,
         aliases=("volcanoes", "volcan"),
     ),
