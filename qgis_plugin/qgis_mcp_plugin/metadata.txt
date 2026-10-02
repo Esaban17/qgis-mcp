@@ -1,0 +1,9 @@
+[general]
+name=QGIS MCP
+qgisMinimumVersion=3.22
+description=Recibe órdenes del servidor MCP para generar mapas temáticos.
+version=0.1.0
+author=Estuardo Saban
+about=Abre un socket local (127.0.0.1:9876) por el que el servidor qgis-mcp agrega capas, encuadra el shape del proyecto y exporta mapas.
+repository=https://github.com/Esaban17/qgis-mcp
+experimental=True
