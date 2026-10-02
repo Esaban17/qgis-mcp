@@ -1,9 +1,18 @@
 # qgis-mcp
 
-Servidor [MCP](https://modelcontextprotocol.io) que genera mapas temáticos con QGIS
-sobre el shape (polígono) de un proyecto. Funciona sin abrir QGIS: usa PyQGIS en modo
-sin interfaz y entrega el mapa en PDF/PNG, las capas recortadas en un GeoPackage y un
-proyecto `.qgz` para seguir editando en QGIS.
+Servidor [MCP](https://modelcontextprotocol.io) que controla QGIS para generar mapas
+temáticos sobre el shape (polígono) de un proyecto. Las capas aparecen en el lienzo de
+QGIS a medida que se agregan, y cada mapa queda como diseño de impresión en el
+Administrador de diseños, listo para retocar. Además se exporta en PDF/PNG y las capas
+recortadas se guardan en un GeoPackage.
+
+```
+Cliente MCP  ──stdio──▶  servidor qgis-mcp  ──socket 127.0.0.1:9876──▶  complemento QGIS MCP (dentro de QGIS)
+```
+
+El mismo paquete es el servidor y el complemento de QGIS. Si no quieres abrir QGIS,
+`QGIS_MCP_MODE=headless` ejecuta todo con PyQGIS sin ventana y guarda un `.qgz` junto
+a cada mapa.
 
 ## Capas que sabe dibujar
 
@@ -39,13 +48,20 @@ fuentes y fecha.
 
 | Herramienta | Qué hace |
 |---|---|
+| `ping` | Comprueba que QGIS y el complemento responden |
 | `list_layer_types` | Lista las 15 capas, sus campos esperados y recortes por defecto |
 | `inspect_dataset` | Muestra CRS, geometría, campos y valores de ejemplo de un archivo |
 | `set_project_area` | Define el shape del proyecto (y opcionalmente el CRS de salida, p. ej. `EPSG:32615`) |
 | `add_layer` | Agrega o reemplaza una capa temática a partir de un archivo vectorial o ráster |
 | `remove_layer`, `reset_map`, `get_map_state` | Administran el mapa en construcción |
-| `generate_map` | Una hoja con varias capas (PDF, PNG, JPG o TIF según la extensión) |
-| `generate_map_series` | Una hoja por capa: Mapa de Zonas de Vida, Mapa de Cuencas, etc. |
+| `generate_map` | Una hoja con varias capas (PDF, PNG, JPG o TIF según la extensión), abierta en el diseñador de QGIS |
+| `generate_map_series` | Una hoja por capa: Mapa de Zonas de Vida, Mapa de Cuencas, etc., cada una como diseño en QGIS |
+
+En QGIS, `set_project_area` agrega el área como contorno rojo y encuadra el mapa;
+`add_layer` coloca cada capa con su estilo en el grupo **Capas temáticas** según el
+orden de dibujo; cada mapa generado crea un grupo oculto **Mapa: título** con las capas
+recortadas y un diseño con el mismo título (generar de nuevo el mismo título lo
+reemplaza).
 
 Ejemplo de conversación: *"Usa `C:/proyecto/area.shp` como área del proyecto, agrega
 zonas de vida, cuencas, ríos y volcanes de `C:/datos/`, y genera la serie de mapas en
@@ -53,41 +69,53 @@ A3 con ríos como referencia en cada hoja."*
 
 ## Instalación
 
-Necesitas QGIS 3.28 o superior (probado con 3.34) y su Python, porque PyQGIS no se
-instala desde PyPI.
+Necesitas QGIS 3.28 o superior (probado con 3.34).
 
-**Linux (Debian/Ubuntu)**
+### 1. Complemento de QGIS
+
+Desde una copia de este repositorio, con cualquier Python 3.10+:
 
 ```bash
-sudo apt install qgis python3-qgis
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install -e .
+pip install -e .
+qgis-mcp-install-plugin            # o: python -m qgis_mcp.install_plugin --profile otro_perfil
 ```
 
-**Windows (OSGeo4W o instalador de QGIS)**: abre la *OSGeo4W Shell* y ejecuta
-`python -m pip install -e .` dentro de esta carpeta.
+Esto copia el paquete a la carpeta de complementos del perfil (`default`):
 
-**macOS**: usa el Python que trae QGIS
-(`/Applications/QGIS.app/Contents/MacOS/bin/python3`) y define
-`QGIS_PREFIX_PATH=/Applications/QGIS.app/Contents/MacOS`.
+- Windows: `%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\qgis_mcp`
+- macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/qgis_mcp`
+- Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/qgis_mcp`
 
-### Configurar el cliente MCP
+Reinicia QGIS y activa **QGIS MCP** en *Complementos ▸ Administrar e instalar
+complementos*. El servidor del complemento se inicia solo (botón **QGIS MCP** en la
+barra de herramientas para detenerlo; `QGIS_MCP_AUTOSTART=0` lo desactiva al abrir).
 
-Claude Desktop (`claude_desktop_config.json`), en Linux:
+### 2. Servidor MCP
+
+El servidor solo necesita Python 3.10+ y el paquete `mcp`; habla con QGIS por el socket.
+En Claude Desktop (`claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "qgis": {
-      "command": "/ruta/a/qgis-mcp/.venv/bin/python",
-      "args": ["-m", "qgis_mcp"]
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/Esaban17/qgis-mcp", "qgis-mcp"]
     }
   }
 }
 ```
 
-En Windows, el comando es el Python de QGIS, por ejemplo
-`C:\\Program Files\\QGIS 3.34.4\\bin\\python-qgis.bat` con `"args": ["-m", "qgis_mcp"]`.
+Variables opcionales: `QGIS_MCP_HOST`, `QGIS_MCP_PORT` (por defecto `9876`, también la
+lee el complemento) y `QGIS_MCP_TIMEOUT` en segundos (por defecto `600`).
+
+### Modo sin QGIS abierto
+
+Con `"env": {"QGIS_MCP_MODE": "headless"}` el servidor usa PyQGIS directamente, así que
+debe ejecutarse con el Python de QGIS: en Linux un entorno creado con
+`python3 -m venv --system-site-packages` sobre `python3-qgis`; en Windows
+`C:\Program Files\QGIS 3.34.4\bin\python-qgis.bat -m qgis_mcp`; en macOS el Python de
+`QGIS.app` con `QGIS_PREFIX_PATH=/Applications/QGIS.app/Contents/MacOS`.
 
 ## Desarrollo
 
@@ -97,5 +125,6 @@ En Windows, el comando es el Python de QGIS, por ejemplo
 ```
 
 Las pruebas crean datos sintéticos de las 15 capas alrededor de un proyecto ficticio en
-Guatemala (`tests/sample_data.py`) y generan mapas reales con QGIS. Sin PyQGIS, solo se
-ejecutan las pruebas del catálogo y del servidor.
+Guatemala (`tests/sample_data.py`) y generan mapas reales con QGIS. `tests/test_plugin.py`
+levanta el complemento sobre el proyecto de QGIS y le habla por el socket. Sin PyQGIS,
+solo se ejecutan las pruebas del catálogo y del servidor.

@@ -17,9 +17,13 @@ test = ["pytest>=8"]
 
 [project.scripts]
 qgis-mcp = "qgis_mcp.server:main"
+qgis-mcp-install-plugin = "qgis_mcp.install_plugin:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+qgis_mcp = ["metadata.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

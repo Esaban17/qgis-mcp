@@ -76,8 +76,15 @@ def render_map(
     grid: bool = True,
     save_project: bool = True,
     labels: bool = True,
+    project=None,
 ) -> dict:
-    """Render one map sheet with the selected layers over the project shape."""
+    """Render one map sheet with the selected layers over the project shape.
+
+    Without ``project`` the sheet is built in a separate project that is saved
+    next to the output. With a live project (the one open in QGIS), the clipped
+    layers go into a hidden "Mapa: <título>" group and the layout is added to
+    its Layout Manager, replacing an earlier map with the same title.
+    """
     ensure_qgis()
     from qgis.core import QgsCoordinateReferenceSystem, QgsProject, QgsRasterLayer
 
@@ -87,6 +94,10 @@ def render_map(
         raise ValueError(f"extent debe ser uno de: {', '.join(EXTENT_MODES)}")
     area = session.require_area()
     entries = session.select(layer_types)
+    if not entries:
+        raise ValueError("No hay capas temáticas en el mapa; agrega alguna con add_layer.")
+    if title is None:
+        title = f"Mapa de {entries[0].display_title}" if len(entries) == 1 else "Mapa temático"
 
     out = Path(output_path).expanduser().resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -107,9 +118,21 @@ def render_map(
         for _, layer in sources_loaded:
             extent.combineExtentWith(layer_extent(layer, target))
 
-    project = QgsProject()
-    project.setCrs(target)
-    project.setTitle(title or area.name)
+    live = project is not None
+    if live:
+        group = _replace_map_group(project, title)
+
+        def add_to_project(layer):
+            project.addMapLayer(layer, False)
+            group.insertLayer(0, layer)
+
+    else:
+        project = QgsProject()
+        project.setCrs(target)
+        project.setTitle(title)
+
+        def add_to_project(layer):
+            project.addMapLayer(layer)
 
     area_saved = write_to_geopackage(
         clip_vector(area_layer, target, None), gpkg, "area_proyecto"
@@ -149,19 +172,15 @@ def render_map(
             if final.featureCount() == 0:
                 warnings.append(f"{spec.title}: ninguna entidad dentro del área del mapa.")
         warnings.extend(info.pop("warnings", []))
-        project.addMapLayer(final)
+        add_to_project(final)
         map_layers.append(final)
         rendered.append({"layer_type": spec.key, "title": entry.display_title, "clip": entry.clip, **info})
 
-    project.addMapLayer(area_saved)
+    add_to_project(area_saved)
     # Map item wants top-most first; the project shape outline always stays on top.
     top_first = [area_saved, *reversed(map_layers)]
     legend_layers = top_first
 
-    if title is None:
-        title = (
-            f"Mapa de {entries[0].display_title}" if len(entries) == 1 else "Mapa temático"
-        )
     subtitle = subtitle if subtitle is not None else f"Proyecto: {area.name}"
     notes = default_notes(area.name, target, sources)
     layout = build_layout(
@@ -171,7 +190,7 @@ def render_map(
     exported = export(layout, str(out), dpi)
 
     project_path = None
-    if save_project:
+    if save_project and not live:
         project_path = str(out.with_suffix(".qgz"))
         if not project.write(project_path):
             warnings.append(f"No se pudo guardar el proyecto QGIS en {project_path}")
@@ -180,12 +199,31 @@ def render_map(
     return {
         "output": exported,
         "project": project_path,
+        "layout": layout.name(),
         "data": str(data_dir),
         "crs": target.authid(),
         "extent": [extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum()],
         "layers": rendered,
         "warnings": warnings,
     }
+
+
+def _replace_map_group(project, title: str):
+    """Drop the layers and layout of an earlier map with this title, return a fresh group."""
+    name = f"Mapa: {title}"
+    root = project.layerTreeRoot()
+    old = root.findGroup(name)
+    if old is not None:
+        project.removeMapLayers([node.layerId() for node in old.findLayers()])
+        root.removeChildNode(old)
+    manager = project.layoutManager()
+    previous = manager.layoutByName(title)
+    if previous is not None:
+        manager.removeLayout(previous)
+    group = root.addGroup(name)
+    group.setItemVisibilityChecked(False)
+    group.setExpanded(False)
+    return group
 
 
 def render_series(
