@@ -158,6 +158,16 @@ async def add_layer(
 
 
 @tool
+async def set_basemap(basemap: Literal["google", "satelite", "osm", "none"]) -> dict:
+    """Show a background under every layer in QGIS and use it in later maps.
+
+    "google" is Google Satellite, "satelite" Esri World Imagery, "osm"
+    OpenStreetMap; "none" removes it. Needs internet. generate_map and
+    generate_map_series use it unless they get their own basemap.
+    """
+
+
+@tool
 async def remove_layer(layer_type: str) -> dict:
     """Remove a thematic layer from the map."""
 

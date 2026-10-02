@@ -23,6 +23,8 @@ class MapCommands:
         # Layer ids this object put in the live project, keyed by layer type
         # ("__area__" for the project shape).
         self._live_ids: dict[str, str] = {}
+        # Background used by generate_map/series when they don't name one.
+        self.basemap = None
 
     @property
     def live(self) -> bool:
@@ -35,6 +37,7 @@ class MapCommands:
             "inspect_dataset": self.inspect_dataset,
             "set_project_area": self.set_project_area,
             "add_layer": self.add_layer,
+            "set_basemap": self.set_basemap,
             "remove_layer": self.remove_layer,
             "reset_map": self.reset_map,
             "get_map_state": self.get_map_state,
@@ -100,6 +103,26 @@ class MapCommands:
             raise
         return {"layer_type": key, "title": entry.display_title, "clip": entry.clip, **details}
 
+    def set_basemap(self, basemap: str) -> dict:
+        """Put a satellite/OSM background under every layer ("none" removes it)."""
+        ensure_qgis()
+        from .renderer import BASEMAPS, basemap_layer
+
+        if basemap == "none":
+            self._drop_live("__basemap__")
+            self.basemap = None
+            return {"basemap": None}
+        layer = basemap_layer(basemap)
+        self.basemap = basemap
+        if self.live:
+            self._drop_live("__basemap__")
+            self.project.addMapLayer(layer, False)
+            self.project.layerTreeRoot().addLayer(layer)  # bottom of the tree
+            self._live_ids["__basemap__"] = layer.id()
+            if self.iface is not None:
+                self.iface.mapCanvas().refresh()
+        return {"basemap": basemap, "title": BASEMAPS[basemap][0]}
+
     def remove_layer(self, layer_type: str) -> dict:
         key = get_layer_type(layer_type).key
         self.session.remove_layer(key)
@@ -112,6 +135,7 @@ class MapCommands:
         self.session.area = None
         self.session.crs = None
         self.session.layers.clear()
+        self.basemap = None
         return self.session.to_dict()
 
     def get_map_state(self) -> dict:
@@ -120,6 +144,7 @@ class MapCommands:
     def generate_map(self, output_path: str, layers=None, page_size="A4", extent="project", open_layout=True, **options) -> dict:
         from .renderer import render_map
 
+        options.setdefault("basemap", self.basemap)
         result = render_map(
             self.session,
             output_path,
@@ -138,6 +163,7 @@ class MapCommands:
     def generate_map_series(self, output_dir: str, format="pdf", layers=None, context_layers=None, page_size="A4", **options) -> dict:
         from .renderer import render_series
 
+        options.setdefault("basemap", self.basemap)
         return render_series(
             self.session,
             output_dir,
@@ -190,7 +216,7 @@ class MapCommands:
         self.project.addMapLayer(layer, False)
         # Keep the group sorted by the catalog's drawing order, top first.
         ordered = sorted(
-            (k for k in self._live_ids if k != "__area__" and k in self.session.layers),
+            (k for k in self._live_ids if k in self.session.layers),
             key=lambda k: -self.session.layers[k].spec.z,
         )
         position = sum(1 for k in ordered if self.session.layers[k].spec.z > entry.spec.z)

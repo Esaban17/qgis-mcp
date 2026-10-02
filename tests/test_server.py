@@ -9,7 +9,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from qgis_mcp import server
 
 TOOLS = {
-    "ping", "list_layer_types", "inspect_dataset", "set_project_area", "add_layer", "remove_layer",
+    "ping", "list_layer_types", "inspect_dataset", "set_project_area", "add_layer", "set_basemap", "remove_layer",
     "reset_map", "get_map_state", "generate_map", "generate_map_series",
 }
 
